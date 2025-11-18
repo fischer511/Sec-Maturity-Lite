@@ -1,0 +1,31 @@
+domain,question_code,answer_score,note,domain_score
+governance,GOV-001,4,MFA je implementiran za večino uporabnikov,3.8
+governance,GOV-002,3,Politike se pregledujejo enkrat letno,3.8
+governance,GOV-003,5,Vodstvo aktivno podpira varnostne iniciative,3.8
+governance,GOV-004,4,Letni varnostni trening izveden,3.8
+governance,GOV-005,3,RACI matrika delno definirana,3.8
+asset,AST-001,3,Inventar sredstev delno vzdrževan v Excelu,3.2
+asset,AST-002,4,Klasifikacija podatkov definirana,3.2
+asset,AST-003,2,Življenjski cikel sredstev ni formaliziran,3.2
+asset,AST-004,3,Deaktivacija računov poteka ročno,3.2
+asset,AST-005,4,Redni pregledi licenc,3.2
+access,ACC-001,5,MFA obvezen za vse kritične sisteme,4.1
+access,ACC-002,4,RBAC implementiran v glavnih aplikacijah,4.1
+access,ACC-003,4,Trimesečni pregled dostopnih pravic,4.1
+access,ACC-004,3,Privilegirani računi delno logirani,4.1
+access,ACC-005,5,Močna gesla obvezna (12+ znakov),4.1
+operations,OPS-001,3,Patching mesečno za strežnike,3.5
+operations,OPS-002,4,Antivirus na vseh delovnih postajah,3.5
+operations,OPS-003,2,Segmentacija omrežja minimalna,3.5
+operations,OPS-004,4,Dnevni backupi kritičnih sistemov,3.5
+operations,OPS-005,4,Centralizirano logiranje (SIEM),3.5
+incident,INC-001,3,Incident response plan obstaja,2.8
+incident,INC-002,2,Ekipa ni urjena v incident response,2.8
+incident,INC-003,3,Incidenti se beležijo v ticketing sistemu,2.8
+incident,INC-004,2,Forensika ni vzpostavljena,2.8
+incident,INC-005,4,Kontakti za eskalacijo definirani,2.8
+continuity,BCM-001,3,BCP dokument obstaja,3.3
+continuity,BCM-002,4,Redni backupi z offsite kopijami,3.3
+continuity,BCM-003,2,BCP testiranje nikoli izvedeno,3.3
+continuity,BCM-004,3,RTO/RPO definirano za kritične sisteme,3.3
+continuity,BCM-005,4,Disaster recovery plan dokumentiran,3.3

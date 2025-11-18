@@ -1,0 +1,323 @@
+1) “Repo spec” za Copilota (prilepi v Copilot Chat kot prvi prompt)
+Vloga: Deluješ kot arhitekt in glavni developer. Postavi celoten monorepo in izgeneriraj začetno delujočo kodo.
+Cilj produkta – Sec-Maturity Lite:
+SaaS orodje za samooceno kibernetske zrelosti (NIS2/ISO 27001 osnove). Organizacije rešijo vprašalnik → izračun stanja (0–5) po domenah → dashboard s trendi po ocenjevanjih → avtomatska priporočila → export PDF. RBAC (Admin, Manager, Viewer), audit log, in “anonymized demo mode”.
+Tech stack (obvezno):
+•	Backend: FastAPI, Python 3.11, SQLAlchemy, Alembic, PostgreSQL, Pydantic v2, Uvicorn, Auth via JWT (PyJWT), bcrypt.
+•	Frontend: React + Vite, TypeScript, Tailwind CSS, shadcn/ui, Zustand (state), Recharts (grafi).
+•	PDF export: WeasyPrint ali pdfkit na backendu (server-side).
+•	Packaging/Run: Docker Compose (api, web, db, nginx opcijsko).
+•	Tests: pytest (backend), Vitest + React Testing Library (frontend).
+•	Lint/format: ruff & black (py), eslint & prettier (ts).
+Minimalne funkcionalnosti M1 (MVP v 10 dneh):
+•	Uporabniki & prijava (JWT), RBAC: Admin, Manager, Viewer.
+•	Organizacije (org), ekipe/oddeli (optional v M2).
+•	Ocenjevanja (assessments): vprašalnik (20–30 trditev) v 6 domenah (Governance, Asset, Access, Ops/Monitoring, Incident, Business Continuity).
+•	Točkovanje: vsaka trditev 0–5 (Likert). Domain score = povprečje; Overall = povprečje domen.
+•	Trend: shranjuj vsako ocenjevanje s assessed_at → prikaz “Overall score over time” + “Domain trend”.
+•	Priporočila: preprosta rules engine na osnovi praga (npr. če Domain < 3 → seznam top priporočil). Priporočila vzemi iz YAML datoteke.
+•	Export: PDF poročilo (organizacija, datum, radar chart domen, bar chart trend, seznam priporočil).
+•	Audit log: kdo je ustvaril ocenjevanje, prijave, exporti (tabla v adminu).
+•	Demo mode: “Create demo org & sample data” gumb, vse anonimizirano.
+Arhitektura repo (ustvari):
+sec-maturity-lite/
+  backend/
+    app/
+      api/ (routers)
+      core/ (config, security, deps)
+      models/
+      schemas/
+      services/ (scoring, recommendations, pdf)
+      rules/ recommendations.yaml
+      utils/
+      main.py
+    alembic/ ...
+    tests/
+    pyproject.toml
+    Dockerfile
+  frontend/
+    src/
+      components/
+      pages/
+      store/
+      lib/
+      App.tsx
+      main.tsx
+    index.html
+    package.json
+    vite.config.ts
+    tailwind.config.ts
+    postcss.config.js
+    Dockerfile
+  deploy/
+    docker-compose.yml
+    nginx.conf (po želji)
+  .env.example
+  README.md
+  copilot-spec.md
+Podatkovni model (ustvari SQLAlchemy modele + migracije):
+•	User(id, email(unique), password_hash, role[admin|manager|viewer], org_id FK nullable, created_at)
+•	Org(id, name, created_at)
+•	Assessment(id, org_id FK, created_by FK User, version(int), assessed_at, overall_score(float))
+•	AssessmentDomain(id, assessment_id FK, domain(str), score(float))
+•	AssessmentAnswer(id, assessment_id FK, domain(str), question_code(str), score(int), note(text?))
+•	AuditLog(id, actor_user_id, org_id, action(str), meta(JSON), created_at)
+API (FastAPI, verzionirano /api/v1):
+•	Auth: POST /auth/login (email, password → JWT), GET /auth/me
+•	Users: POST /users (admin), GET /users/me, PATCH /users/me
+•	Orgs: POST /orgs (admin), GET /orgs/:id, GET /orgs (admin), PATCH /orgs/:id
+•	Assessments:
+o	POST /orgs/:org_id/assessments (ustvari osnutek ali končaj)
+o	GET /orgs/:org_id/assessments (lista, filter by date)
+o	GET /assessments/:id (vse + answers + domains)
+o	POST /assessments/:id/answers (bulk upsert Q/A)
+o	POST /assessments/:id/finalize (izračunaj domain & overall score, zapiši trend)
+o	GET /assessments/:id/pdf (vrne PDF)
+•	Recommendations:
+o	GET /assessments/:id/recommendations (generiraj iz YAML pravil)
+•	Audit:
+o	GET /audit (admin), filt: actor, org, action, date
+Scoring (services/scoring.py):
+•	compute_domain_scores(answers) -> dict[domain->float]
+•	compute_overall_score(domain_scores) -> float
+•	Vse vrednosti 0–5; zaokroži na 0.1.
+Recommendations rules (services/recommendations.py):
+•	YAML struktura (primer):
+•	governance:
+•	  - if: "score < 3"
+•	    then:
+•	      id: GOV-01
+•	      title: "Vzpostavi ISMS jedro"
+•	      details: "Politika, vloge, register sredstev, ocena tveganj."
+•	access:
+•	  - if: "score < 3"
+•	    then:
+•	      id: ACC-02
+•	      title: "Uvedi MFA za kritične sisteme"
+•	      details: "MFA za VPN, admin, e-pošto."
+•	Enostaven parser: eval samo “score < N” (ne izvajaj poljubnega koda!).
+Frontend – strani (ustvari osnovne):
+•	/login
+•	/dashboard (overall, domain cards, recent assessments)
+•	/assessments/new (wizard: domains → questions, Likert 0–5, notes)
+•	/assessments/:id (pregled, grafi, recommendations, export PDF)
+•	/admin/audit
+•	/demo (ustvari demo org+assessments)
+UI elementi (shadcn):
+•	Card, Button, Input, Select, Textarea, Tabs, Table, Dialog, Toast.
+•	Recharts: LineChart (trend), RadarChart (domain profile), BarChart (domain comparison).
+Varnost:
+•	JWT v Authorization: Bearer.
+•	Password hashing: bcrypt.
+•	CORS: web → api.
+•	Rate-limit (simple middleware) za auth endpointe.
+•	.env za DB creds, JWT secret, PDF engine.
+PDF poročilo (services/pdf.py):
+•	Server-side render Jinja2 template → PDF (WeasyPrint/pdfkit).
+•	Vključi logotip (fallback), naslov, org ime, datum, radar chart (slika iz FE ali server-side chart lib), tabelo domain scores, seznam priporočil.
+Testi:
+•	Backend: unit za scoring & recommendations, API tests (auth, assessments).
+•	Frontend: render test za Dashboard, form validation za Assessment wizard.
+Docker Compose:
+•	db (postgres:15)
+•	api (uvicorn, depends_on db)
+•	web (vite dev ali nginx za prod)
+•	mreža, volume za db.
+Deliverables (ustvari):
+•	Delujoč docker-compose up (dev) → FE na localhost:5173, API na localhost:8000.
+•	Seed skripta: ustvari admin uporabnika, demo org, 2 ocenjevanja.
+Dokumentacija (README):
+•	Setup (env, docker), dev scripts, kako dodati vprašanja, kako urejati YAML pravila, kako generirati PDF.
+Ko končaš skeleton, generiraj začetne datoteke in kratko pojasni, kako projekt pognati lokalno.
+________________________________________
+2) Nadaljnji “step-by-step” ukazi za Copilot (po prvem scaffoldu)
+A. Dodaj začetni vprašalnik (20–30 vprašanj, 6 domen):
+Ustvari datoteko backend/app/services/questions.py z 6 domenami in 20–30 vprašalniki (Likert 0–5). Vprašanja naj bodo kratka, generična, v slovenščini (npr. MFA, patching, backup, incident playbooks, logging). Dodaj helper za pridobitev vprašanj po domeni.
+B. Implementiraj scoring in finalize:
+Izvedi compute_domain_scores in compute_overall_score. Endpoint POST /assessments/:id/finalize naj prebere answers, izračuna domene in overall, shrani AssessmentDomain zapise in overall_score.
+C. YAML priporočila:
+Ustvari backend/app/rules/recommendations.yaml z minimalno 2 pravili na domeno (score < 3). Implementiraj services/recommendations.py parser in endpoint za vračanje priporočil.
+D. Frontend wizard:
+Zgradi /assessments/new wizard: dropdown domena → lista trditev z Likert (0–5), textarea “opomba”, gumbi “Naprej/Nazaj/Shrani osnutek/Končaj oceno”. Po “končaj” kliči finalize endpoint in redirect na /assessments/:id.
+E. Dashboard grafi:
+Na /dashboard dodaj Recharts LineChart (overall trend po assessed_at) in RadarChart (zadnje ocenjevanje po domenah). Dodaj mini tabelo “zadnja priporočila”.
+F. PDF export:
+Implementiraj GET /assessments/:id/pdf: server-side generiraj PDF iz Jinja2 template. Za grafe uporabi fallback (tabele + številke); grafične slike lahko dodaš v M2.
+G. RBAC & Audit log:
+Uveljavi role guard na endpointih (admin ustvarja userje, manager ustvarja ocene, viewer bere). Vsak POST/PUT/DELETE naj pušča AuditLog zapis.
+H. Seed skripta:
+Ustvari backend/app/utils/seed.py: admin (admin@example.com/Admin!234), demo org, demo user manager, 2 demo ocenjevanji s psevdopodatki.
+________________________________________
+3) Acceptance kriteriji za Copilota (dodaj kot prompt)
+Pripravi 10 “acceptance tests” (opisno), ki morajo držati ob koncu M1:
+1.	Uporabnik se lahko prijavi in vidi /dashboard.
+2.	Admin lahko ustvari organizacijo in managerja.
+3.	Manager lahko ustvari ocenjevanje, vnese odgovore in oceno “finalize-a”.
+4.	Izračun domen & overall je pravilen (unit test).
+5.	Dashboard prikaže trend po treh ocenjevanjih (line chart).
+6.	Radar chart prikaže profil domen zadnjega ocenjevanja.
+7.	Endpoint vrne priporočila glede na YAML pravila.
+8.	PDF se uspešno generira in vsebuje vsaj: header, datum, domain scores, top 5 priporočil.
+9.	RBAC prepreči viewerju ustvarjanje ocenjevanja.
+10.	Audit log beleži login, create assessment, finalize, export.
+________________________________________
+4) Prompt za hitro lokalno poganjanje (po generiranju)
+Dodaj README.md korake za lokalni zagon:
+•	kopiraj .env.example → .env
+•	docker-compose up --build
+•	seed: docker compose exec api python -m app.utils.seed
+•	FE: http://localhost:5173, API: http://localhost:8000
+•	prijava: admin@example.com / Admin!234
+________________________________________
+5) Prompt za “Next steps” (M2 razširitev – opcijsko)
+Dodaj M2 backlog:
+•	večnivojski vprašalnik (NIS2 mapiranje),
+•	prilagodljiva teža domen,
+•	CSV import/Export ocen,
+•	schedules za “opomnike na ponovno oceno” (cron),
+•	organisations → teams (oddeli),
+•	SSO (OIDC),
+•	bolj napreden rules engine (več pogojev),
+•	brandable PDF (logo org),
+•	telemetry (OpenTelemetry),
+•	infra IaC (Terraform) za cloud.
+
+tu so “navodila za M2” z zelo konkretnimi koraki, izbranim stackom in copy-paste Copilot/prompte, da lahko takoj gradiš.
+Stack (privzeto)
+•	Backend: FastAPI (Python), PostgreSQL, SQLAlchemy, Alembic, APScheduler (urniki), Pydantic
+•	Frontend: React + Vite, TypeScript, Tailwind, shadcn/ui
+•	Auth/SSO: Keycloak (OIDC) (lahko zamenjaš z Auth0/Azure AD)
+•	Queue (opcijsko): Celery + Redis (za težje jobe)
+•	PDF: WeasyPrint ali Playwright/Puppeteer prek render strežnika
+•	Telemetry: OpenTelemetry SDK (OTel) → OTLP exporter (npr. Grafana Tempo/OTel Collector)
+•	IaC: Terraform za AWS (VPC, RDS Postgres, ECS Fargate ali EC2, S3 za static, ALB)
+________________________________________
+Model podatkov (dodaj v M2)
+Novi entity-ji / polja:
+•	organisations (id, name, logo_url, oidc_client_id, …)
+•	teams (id, org_id FK, name)
+•	users (id, org_id, team_id?, oidc_sub, email, role)
+•	domains (id, key, title) — npr. Governance, Risk, Tech Controls…
+•	questionnaires (id, org_id?, version, is_active, levels:int)
+•	questions (id, questionnaire_id, domain_id, parent_question_id?, level:int, text, type, options_json)
+•	weights (id, questionnaire_id, domain_id, weight:float) ← prilagodljive teže
+•	assessments (id, org_id, team_id?, questionnaire_id, state, created_at, due_at, completed_at)
+•	responses (id, assessment_id, question_id, value_json, created_by)
+•	scores (id, assessment_id, domain_id, raw:float, weighted:float)
+•	recommendations (id, assessment_id, domain_id?, title, body, severity, rule_id?)
+•	schedules (id, org_id, cron, next_run_at, channel:email|webhook, template_id?)
+•	imports (id, org_id, kind:csv, status, storage_key, created_at, error_json?)
+________________________________________
+Funkcionalnosti & navodila (po točkah)
+1) Večnivojski vprašalnik (NIS2 mapiranje)
+Cilj: podpora level 1..N + parent_question_id za branching.
+Koraki:
+1.	Dodaj kolone level in parent_question_id v questions.
+2.	Endpoints:
+o	GET /questionnaires/{id} vrne drevo vprašanj (po domenskih sklopih).
+o	POST /assessments ustvari ocenjevanje iz verzije vprašalnika.
+o	POST /assessments/{id}/responses sprejme odgovor in vrne naslednja vprašanja glede na branching.
+3.	Frontend: komponenta QuestionTree z “stepperjem” in podporo za “drill-down”.
+Copilot prompt (backend):
+Generate FastAPI models and SQLAlchemy schemas for questionnaires, questions (with parent_question_id, level), assessments, and responses. Provide CRUD endpoints and a GET /questionnaires/{id}/tree that returns questions grouped by domain and nested by parent_question_id.
+Copilot prompt (frontend):
+Build a React component QuestionTree that renders a multi-level questionnaire with branching. Fetch /questionnaires/:id/tree, show domains as sections, and render child questions when a parent is answered. Persist answers via /assessments/:id/responses.
+________________________________________
+2) Prilagodljiva teža domen
+Koraki:
+1.	Tabela weights (po questionnaire_id + domain_id).
+2.	Admin UI: sliderji (0–2) po domenah, default 1.0.
+3.	Izračun: weighted = raw * domain_weight; total = Σ domain_weighted / Σ domain_weight.
+Copilot prompt:
+Implement domain weights for scoring. Add weights table and merge weights into the scoring pipeline. Provide an admin endpoint PUT /questionnaires/:id/weights and adjust POST /assessments/:id/score to apply weights.
+________________________________________
+3) CSV import/Export ocen
+Koraki:
+•	Export: GET /assessments/:id/export.csv → stolpci: domain, question_key, answer, raw_score, weighted_score.
+•	Import: POST /imports naloži CSV (S3 ali lokal), validacija (manjkajoča vprašanja, neznani ključi), kreiraj responses.
+Copilot prompt:
+Add CSV export and import for assessments. For export, stream a CSV with headers: domain, question_key, answer, raw_score, weighted_score. For import, validate rows, map to question IDs, upsert responses, and return a summary of created/updated counts.
+________________________________________
+4) Schedules za “opomnike na ponovno oceno” (cron)
+Koraki:
+•	Tabela schedules (org_id, cron, channel, template_id).
+•	APScheduler job: vsakih X min prebere due assessments (npr. 90 dni od zadnje ocene) in pošlje e-mail (SMTP) ali webhook.
+Copilot prompt:
+Integrate APScheduler with FastAPI. Add a job that runs every 10 minutes, finds assessments older than 90 days (or matching schedules.cron), and sends reminder emails using Jinja2 templates.
+________________________________________
+5) Organisations → Teams (oddeli)
+Koraki:
+•	Dodaj teams in team_id v assessments + RBAC (user vidi samo svoj org_id in, če role=manager, svoj team_id).
+•	UI: filter po teamu, agregatni grafi po oddelkih.
+Copilot prompt:
+Extend the data model with teams (departments). Enforce RBAC so that users can access only their org and, if role is manager, only their team’s assessments. Add /teams/:id/summary with domain scores.
+________________________________________
+6) SSO (OIDC)
+Koraki:
+•	Keycloak realm, client (confidential/public), redirect URIs.
+•	Backend: preveri JWT (PyJWT), jwks discovery (/.well-known/openid-configuration), mapiraj sub, email, groups → vloge.
+•	Frontend: PKCE flow (oidc-client-ts) ali preprost “Login with Keycloak”.
+Copilot prompt:
+Add OIDC authentication with Keycloak. Implement JWT validation middleware in FastAPI (JWKS discovery, audience check). On first login, upsert user by sub and email, assign org by domain mapping.
+________________________________________
+7) Naprednejši rules engine (več pogojev)
+Cilj: priporočila glede na kombinacije odgovorov/score.
+Koraki:
+•	Tabela rules (id, name, conditions_json, action_json, severity).
+•	Conditions podpirajo: domain_score < X, question:value == Y, AND/OR.
+•	Ob zaključku ocene: eval rules → zapiši recommendations.
+Copilot prompt:
+Implement a simple JSON-based rules engine. Conditions support domain score thresholds and question value matches with AND/OR groups. Produce recommendations records when rules match. Provide CRUD for rules and a test suite.
+________________________________________
+8) Brandable PDF (logo org)
+Koraki:
+•	Shranjuj logo_url v organisations.
+•	PDF template (Jinja2 + WeasyPrint): naslovnica (ime org, datum, verzija vprašalnika), povzetek, grafi po domenah, seznam priporočil, priloga z odgovori.
+Copilot prompt:
+Generate a branded PDF report with WeasyPrint. Use org.logo_url, org.name, assessment scores, domain charts (render SVG via Chart.js on server or simple inline SVG), and a recommendations appendix.
+________________________________________
+9) Telemetry (OpenTelemetry)
+Koraki:
+•	Backend: opentelemetry-sdk, opentelemetry-instrumentation-fastapi, psycopg2, exporter OTLP → OTel Collector.
+•	Frontend: pošlji custom events (npr. start assessment, question answered).
+•	Dashboard: Grafana lok (Tempo/Prometheus).
+Copilot prompt:
+Add OpenTelemetry tracing and metrics to FastAPI and PostgreSQL. Configure OTLP exporter to OTEL_EXPORTER_OTLP_ENDPOINT. Instrument key endpoints and DB queries, and add custom spans for scoring and PDF generation.
+________________________________________
+10) IaC (Terraform) za cloud
+Koraki:
+•	Moduli: vpc, rds-postgres, ecs-fargate (ali ec2), alb, acm (TLS), s3 (static), secretsmanager.
+•	CI/CD: GitHub Actions → terraform fmt/validate/plan/apply na infra/ mapo; build & push Docker images (backend/frontend) → ECR.
+Copilot prompt:
+Create Terraform modules for VPC, RDS Postgres, ECS Fargate service for FastAPI, ALB with HTTPS via ACM, and S3 for static assets. Output service URL and database connection string. Add GitHub Actions workflow to build/push Docker images and run terraform plan/apply on infra/.
+________________________________________
+“Next steps” (kratka checklista)
+1.	DB migracije (Alembic): domains, weights, teams, schedules, rules, recommendations
+2.	Auth (OIDC): JWKS, role mapping, org scoping
+3.	Scoring v2: podpora weights + rules engine → recommendations
+4.	CSV in PDF: export/import, brandable poročila
+5.	Scheduler: APScheduler + email templates
+6.	Telemetry: OTel (traces/metrics), osnovni dashboard
+7.	IaC: Terraform baseline + CI/CD
+________________________________________
+Bonus: “super-prompt” za Copilot v VS Code
+Prilepi v prazen README-dev.md in od tam kopiraj delčke:
+You are my coding pair for a FastAPI + PostgreSQL + React/TS project called “Sec-Maturity Lite (M2)”.
+Implement:
+•	multi-level questionnaire with branching (SQLAlchemy models + /questionnaires/:id/tree),
+•	domain weight sliders and weighted scoring,
+•	CSV export/import for assessments,
+•	reminders via APScheduler (90-day re-assess),
+•	org → teams model and RBAC,
+•	OIDC with Keycloak (JWT validation, user upsert, role mapping),
+•	JSON rules engine that emits recommendations,
+•	branded PDF via WeasyPrint,
+•	OpenTelemetry tracing/metrics,
+•	Terraform modules for AWS (VPC, RDS, ECS Fargate, ALB, S3, ACM).
+Provide code in small, testable chunks with docstrings, Pydantic schemas, and curl examples for each endpoint.
+________________________________________
+Če želiš, ti v naslednjem koraku pripravim:
+•	Alembic migracije (SQL skripte)
+•	OpenAPI shemo endpointov
+•	Terraform skeleton (infra/)
+

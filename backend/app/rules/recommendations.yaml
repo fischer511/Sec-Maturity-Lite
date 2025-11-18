@@ -1,0 +1,71 @@
+governance:
+  - if: "score < 3"
+    then:
+      id: GOV-01
+      title: "Vzpostavi ISMS jedro"
+      details: "Vzpostavi osnovno ISMS strukturo: politiko varovanja informacij, imenuj odgovornega za varnost, vzpostavi register informacijskih sredstev in izvedi temeljno oceno tveganj."
+  - if: "score < 2"
+    then:
+      id: GOV-02
+      title: "Opredeli varnostne vloge"
+      details: "Jasno opredeli vloge in odgovornosti za kibernetsko varnost v organizaciji. Imenuj CISO ali ekvivalent."
+
+asset:
+  - if: "score < 3"
+    then:
+      id: ASS-01
+      title: "Ustvari register sredstev"
+      details: "Vzpostavi celovit register vseh informacijskih sredstev (strojna oprema, programska oprema, podatki). Klasificiraj glede na kritičnost."
+  - if: "score < 2"
+    then:
+      id: ASS-02
+      title: "Klasificiraj podatke"
+      details: "Uvedi shemo za klasifikacijo podatkov (javno, interno, zaupno, strogo zaupno). Označi vse sisteme in dokumente."
+
+access:
+  - if: "score < 3"
+    then:
+      id: ACC-01
+      title: "Uvedi MFA za kritične sisteme"
+      details: "Implementiraj večfaktorsko avtentikacijo (MFA) za dostop do VPN-ja, administratorskih računov, e-pošte in poslovnih aplikacij."
+  - if: "score < 2.5"
+    then:
+      id: ACC-02
+      title: "Vzpostavi upravljanje dostopov"
+      details: "Vzpostavi formalen postopek za dodeljevanje, spreminjanje in odvzemanje dostopnih pravic. Izvajaj redne preglede dostopov."
+
+operations:
+  - if: "score < 3"
+    then:
+      id: OPS-01
+      title: "Centraliziraj beleženje dogodkov"
+      details: "Implementiraj centralizirano beleženje varnostnih dogodkov (SIEM ali podobno). Shranjuj dnevniške zapise vsaj 12 mesecev."
+  - if: "score < 2.5"
+    then:
+      id: OPS-02
+      title: "Uvedi upravljanje popravkov"
+      details: "Vzpostavi sistemski proces za upravljanje varnostnih popravkov. Kritične ranljivosti zaploči v 7 dneh."
+
+incident:
+  - if: "score < 3"
+    then:
+      id: INC-01
+      title: "Pripravi načrt odziva na incidente"
+      details: "Ustvari in testiraj načrt odziva na kibernetske incidente. Opredeli ekipo, vloge, komunikacijske kanale in postopke za eskalacijo."
+  - if: "score < 2"
+    then:
+      id: INC-02
+      title: "Vzpostavi detekcijo incidentov"
+      details: "Implementiraj orodja in procese za zaznavanje varnostnih incidentov (antivirus, IDS/IPS, monitoring). Opredeli alarme in prage."
+
+continuity:
+  - if: "score < 3"
+    then:
+      id: BCP-01
+      title: "Vzpostavi varnostne kopije"
+      details: "Implementiraj redno izdelovanje varnostnih kopij kritičnih podatkov. Testiraj obnovitev najmanj 2x letno. Upoštevaj pravilo 3-2-1."
+  - if: "score < 2.5"
+    then:
+      id: BCP-02
+      title: "Pripravi načrt neprekinjenega poslovanja"
+      details: "Ustvari BCP/DRP načrt za kritične sisteme. Opredeli RTO in RPO cilje. Izvedi letno vajo."
